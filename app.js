@@ -6,6 +6,10 @@ var bodyParser = require('body-parser')
 var roomList = new ArrayList();
 var playerList = new ArrayList();
 //ibm
+// cfenv provides access to your Cloud Foundry environment
+// for more info, see: https://www.npmjs.com/package/cfenv
+var cfenv = require('cfenv');
+var appEnv = cfenv.getAppEnv();
 var ibmbluemix = require('ibmbluemix');
 var ibmpush = require('ibmpush');
 var config = {
@@ -298,8 +302,6 @@ function randomString(len) {
 　　}
 　　return pwd;
 }
-var server = app.listen(3000, function () {
-	var host = server.address().address;
-	var port = server.address().port;
-  console.log('allEscaping listening at http://%s:%s', host, port);
+var server = app.listen(appEnv.port,'0.0.0.0', function () {
+	console.log("server starting on " + appEnv.url);
 });
