@@ -2,8 +2,10 @@
 var app = express();
 var roomScript = require('./room.js');
 var ArrayList = require('ArrayList');
+var bodyParser = require('body-parser')
 var roomList = new ArrayList();
 var playerList = new ArrayList();
+//ibm
 var ibmbluemix = require('ibmbluemix');
 var ibmpush = require('ibmpush');
 var config = {
@@ -13,6 +15,12 @@ var config = {
 };
 ibmbluemix.initialize(config);
 var push = ibmpush.initializeService();
+
+// parse application/x-www-form-urlencoded
+app.use(bodyParser.urlencoded({ extended: false }))
+// parse application/json
+app.use(bodyParser.json())
+
 app.get('/test',function(req,res){
 	var message = {
 		alert : "123",
@@ -27,20 +35,23 @@ app.get('/test',function(req,res){
 	});
 	res.send('thanks');
 });
-
+app.post('/',function(req,res){
+	res.send(req.body);
+});
 app.get('/',function(req,res){
 	
 	var date = new Date();
 	var time = 30*60*1000;
 	var d = new Date(date.valueOf()+time);	
-	res.send(randomString(6)+'</br>'+date.valueOf()+'   '+date.toLocaleString()+'</br>'+d.toLocaleString());
+	//res.send(randomString(6)+'</br>'+date.valueOf()+'   '+date.toLocaleString()+'</br>'+d.toLocaleString());
+	res.send(playerList+'</br>'+roomList);
 });
 // Create new player on connected
 // Add to PlayerList
 app.post('/newPlayer',function(req,res){
-	var fbId='';
-	var name='';
-	var bluetoothMac='';
+	var fbId=req.body.fbId;
+	var name=req.body.name;
+	var bluetoothMac=req.body.bluetoothMac;
 	var ingame=false;
 	playerList.each(function(p){
 		if(p.fdId==fbId&&p.room!=null){
@@ -61,6 +72,7 @@ app.post('/newPlayer',function(req,res){
 //CREATEROOM
 app.post('/createroom',function(req,res){
 	var exist = false;
+	var result = false;
 	do {
 		var pinCode=randomString(6);
 		roomList.each(function(r){
@@ -68,12 +80,27 @@ app.post('/createroom',function(req,res){
 				exist=true;
 		});	
 	} while(exist);
+	var hostfbId=req.body.hostfbId; //房長fbid
+	var time = req.body.time;//遊戲時間(分鐘)
 	var date = new Date();
-	var time = 30;//遊戲時間(分鐘)
+	var host=null;
+	playerList.each(function(p){
+		if(p.fdId==hostfbId){
+			host=p;
+		}
+	});
 	var expireTime = new Date(date.valueOf()+time*60*1000);	//遊戲結束時間
-	
-	var room = new Room(hostfbId,time,expireTime,pinCode);
-	res.send('success');
+	var room = new Room(host,time,expireTime,pinCode);
+	roomList.add(room);
+	playerList.each(function(p){
+		if(p.fdId==hostfbId){
+			if(p.joinRoom(pinCode)){
+				p.isAdmin();
+				p.Ready();
+			}
+		}
+	});
+	res.send(hostfbId+pinCode);
 });
 //CLOSEROOM
 app.post('/closeroom',function(req,res){
@@ -81,19 +108,19 @@ app.post('/closeroom',function(req,res){
 });
 //JOINROOM
 app.post('/joinroom',function(req,res){
-	var fbId='';
-	var pinCode='';
+	var fbId=req.body.fbId;
+	var pinCode=req.body.pinCode;
 	var result='';
 	playerList.each(function(p){
 		if(p.fdId==fbId){
-			result=p.joinRoom(pinCode);
+			(p.joinRoom(pinCode))
 		}		
 	});
 	res.send(result);
 });
 //LEAVEROOM
 app.post('/leaveroom',function(req,res){
-	var fbId='';
+	var fbId=req.body.fbId;
 	playerList.each(function(p){
 		if(p.fdId==fbId){
 			p.leaveRoom();	
@@ -103,7 +130,17 @@ app.post('/leaveroom',function(req,res){
 });
 //CHATROOM
 app.post('/chatroom',function(req,res){
-	res.send('123');
+	var message = {
+		alert : req.body.msg
+	}
+	var did=[{"consumerId" : "101212"},{"consumerId" : "6666666"}];
+
+	push.sendNotificationByConsumerId(message,did).then(function(response) {
+		console.log(response);
+	},function(err) {
+		console.log(err);
+	});
+	res.send('success');
 });
 //PLAYER_READY PLAYER_CANCEL
 app.post('/player',function(req,res){
@@ -111,17 +148,16 @@ app.post('/player',function(req,res){
 });
 //GAME_START GAME_FINISH
 app.post('/game',function(req,res){
-	res.send('123');
+
 });
 
-function Room(_hostfbId,_time,_expireTime,_pinCode){
-	this.hostfbId = _hostfbId;//房長FBID
+function Room(_host,_time,_expireTime,_pinCode){
+	this.host = _host;//房長FBID
 	this.time = _time;//遊戲時間
 	this.pinCode = _pinCode;//房間pinCode
 	this.expireTime= _expireTime;//遊戲結束時間
 	this.players = new ArrayList();//房間玩家
 	this.roomState = 'WAITING';//房間狀態
-	this.playerCount= 0;
 	this.broadCast = function(text)
 	{
 		var consumerId=[];
@@ -180,16 +216,16 @@ function Player(_fbId,_name,_bluetoothMac){
 	this.name = _name;
 	this.bluetoothMac= _bluetoothMac;
 	this.room = null;
-	this.role = '';//0-hunter 1-person
-	this.status = '';//0-Alive 1-Dead
+	this.role = 1;//0-hunter 1-person 2-admin
+	this.status = 0;//0-Alive 1-Dead
 	this.deadReason = '';
 	this.location=[];
 	this.updatetime='';
 	this.is_ready=false;
 	this.init=function(){
 		this.room=null;
-		this.role = '';//0-hunter 1-person
-		this.status = '';//0-Alive 1-Dead
+		this.role = '1';//0-hunter 1-person
+		this.status = '0';//0-Alive 1-Dead
 		this.deadReason = '';
 		this.location=[];
 		this.updatetime= '';
@@ -209,6 +245,15 @@ function Player(_fbId,_name,_bluetoothMac){
 			this.is_ready = false;
 		}		
 	}
+	this.isAdmin = function(){
+		this.role = 2;
+	}
+	this.isPerson = function(){
+		this.role = 1;
+	}
+	this.ishunter = function(){
+		this.role = 0;
+	}
 	this.joinRoom = function(_pincode)
 	{
 		var cplayer = this;
@@ -217,24 +262,26 @@ function Player(_fbId,_name,_bluetoothMac){
 			if (r.pinCode == _pincode)
 			{
 				roomExist = true;
-				console.log("> ROOM EXIST! Count:" + r.playerCount + " / " + r.maxPlayer);
-				r.players.push(cplayer);
-				r.playerCount++;
+				r.players.add(cplayer);
 				cplayer.room = r;
 				console.log("[!] " + cplayer.name + " joined room " + r.hostfbId);
-				r.broadCast("[JOINROOM;" + cplayer.name + "]");	
-				return 'success';
+				var text=[{name:r.host.name,status: r.host.is_ready,role: r.host.role}];
+				r.players.each(function(p){
+					text.push({name:p.name,status: p.is_ready,role: p.role});
+				});
+				r.broadCast(text);
+				return true;
 			}
 		});
 		if (roomExist == false)
 		{
-			return 'failed';
+			return false;
 		}
 	}
 	this.leaveRoom = function()
 	{
+		var cplayer = this;
 		this.room.players.removeElement(this);
-		this.room.playerCount--;
 		this.room.broadCast("[LEFTROOM;" + this.name + "]");
 		cplayer.init();
 	}
