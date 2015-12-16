@@ -21,9 +21,9 @@ ibmbluemix.initialize(config);
 var push = ibmpush.initializeService();
 
 // parse application/x-www-form-urlencoded
-app.use(bodyParser.urlencoded({ extended: false }))
+app.use(bodyParser.urlencoded({ extended: false }));
 // parse application/json
-app.use(bodyParser.json())
+app.use(bodyParser.json());
 
 app.get('/test',function(req,res){
 	var message = {
@@ -116,8 +116,8 @@ app.post('/joinroom',function(req,res){
 	var pinCode=req.body.pinCode;
 	var result='';
 	playerList.each(function(p){
-		if(p.fdId==fbId){
-			p.joinRoom(pinCode);
+		if(p.fdId==fbId&&p.joinRoom(pinCode)){
+			p.room.broadCast(p.room.getStatus());
 		}		
 	});
 	res.send(result);
@@ -127,7 +127,8 @@ app.post('/leaveroom',function(req,res){
 	var fbId=req.body.fbId;
 	playerList.each(function(p){
 		if(p.fdId==fbId){
-			p.leaveRoom();	
+			p.leaveRoom();
+			p.room.broadCast(p.room.getStatus());
 		}		
 	});
 	res.send('123');
@@ -154,9 +155,11 @@ app.post('/player',function(req,res){
 		if(p.fdId==fbId){
 			if(action=='ready') {
 				p.Ready();
+				p.room.broadCast(p.room.getStatus());
 				res.send('ready');
 			}else if(action=='cancel'){
 				p.Cancel();
+				p.room.broadCast(p.room.getStatus());
 				res.send('cancel');
 			}
 		}
@@ -169,7 +172,7 @@ app.post('/game',function(req,res){
 	var hostfbId=req.body.hostfbId;
 	roomList.each(function(r){
 		if(action=="start"&&r.host.fbId==hostfbId&& r.IsReady){
-
+			r.Play();
 		}
 	})
 
@@ -235,8 +238,16 @@ function Room(_host,_time,_expireTime,_pinCode){
 	}
 	this.getStatus =  function()
 	{
+		var ready = true;
+		this.players.each(function(p){
+			if(!p.is_ready){
+				this.ready();
+			}else{
+				this.Wait();
+			}
+		});
 		var text=[{'ROOMSATUS':{'name':this.host.name,'status': this.host.is_ready,'gametime': this.time,'players':[]}}];
-		r.players.each(function(p){
+		this.players.each(function(p){
 			text.players.push({name:p.name,status: p.is_ready,role: p.role});
 		});
 		return text;
@@ -297,11 +308,6 @@ function Player(_fbId,_name,_bluetoothMac){
 				r.players.add(cplayer);
 				cplayer.room = r;
 				console.log("[!] " + cplayer.name + " joined room " + r.host.name);
-				var text=[{name:r.host.name,status: r.host.is_ready,role: r.host.role}];
-				r.players.each(function(p){
-					text.push({name:p.name,status: p.is_ready,role: p.role});
-				});
-				r.broadCast(text);
 				return true;
 			}
 		});
