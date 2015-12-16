@@ -117,7 +117,7 @@ app.post('/joinroom',function(req,res){
 	var result='';
 	playerList.each(function(p){
 		if(p.fdId==fbId){
-			(p.joinRoom(pinCode))
+			p.joinRoom(pinCode);
 		}		
 	});
 	res.send(result);
@@ -148,15 +148,35 @@ app.post('/chatroom',function(req,res){
 });
 //PLAYER_READY PLAYER_CANCEL
 app.post('/player',function(req,res){
-	res.send('123');
+	var action=req.query.action;
+	var fbId=req.body.fbId;
+	playerList.each(function(p){
+		if(p.fdId==fbId){
+			if(action=='ready') {
+				p.Ready();
+				res.send('ready');
+			}else if(action=='cancel'){
+				p.Cancel();
+				res.send('cancel');
+			}
+		}
+	});
+
 });
 //GAME_START GAME_FINISH
 app.post('/game',function(req,res){
+	var action=req.query.action;
+	var hostfbId=req.body.hostfbId;
+	roomList.each(function(r){
+		if(action=="start"&&r.host.fbId==hostfbId&& r.IsReady){
+
+		}
+	})
 
 });
 
 function Room(_host,_time,_expireTime,_pinCode){
-	this.host = _host;//房長FBID
+	this.host = _host;
 	this.time = _time;//遊戲時間
 	this.pinCode = _pinCode;//房間pinCode
 	this.expireTime= _expireTime;//遊戲結束時間
@@ -168,7 +188,7 @@ function Room(_host,_time,_expireTime,_pinCode){
 		var message = {
 			alert : text
 		}
-		this.players.foreach(function(p){
+		this.players.each(function(p){
 			consumerId.push({"consumerId" : p.fbId});
 		});			
 		push.sendNotificationByConsumerId(message,consumerId).then(function(response) {
@@ -212,6 +232,14 @@ function Room(_host,_time,_expireTime,_pinCode){
 	this.IsFinished = function()
 	{
 		return (this.roomState == "FINISHED");
+	}
+	this.getStatus =  function()
+	{
+		var text=[{'ROOMSATUS':{'name':this.host.name,'status': this.host.is_ready,'gametime': this.time,'players':[]}}];
+		r.players.each(function(p){
+			text.players.push({name:p.name,status: p.is_ready,role: p.role});
+		});
+		return text;
 	}
 }
 
@@ -268,7 +296,7 @@ function Player(_fbId,_name,_bluetoothMac){
 				roomExist = true;
 				r.players.add(cplayer);
 				cplayer.room = r;
-				console.log("[!] " + cplayer.name + " joined room " + r.hostfbId);
+				console.log("[!] " + cplayer.name + " joined room " + r.host.name);
 				var text=[{name:r.host.name,status: r.host.is_ready,role: r.host.role}];
 				r.players.each(function(p){
 					text.push({name:p.name,status: p.is_ready,role: p.role});
