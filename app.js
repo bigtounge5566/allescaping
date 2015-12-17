@@ -114,24 +114,25 @@ app.post('/closeroom',function(req,res){
 app.post('/joinroom',function(req,res){
 	var fbId=req.body.fbId;
 	var pinCode=req.body.pinCode;
-	var result='';
+	var result = false;
 	playerList.each(function(p){
 		if(p.fdId==fbId&&p.joinRoom(pinCode)){
-			p.room.broadCast(p.room.getStatus());
+			result=true;
 		}		
 	});
 	res.send(result);
 });
 //LEAVEROOM
 app.post('/leaveroom',function(req,res){
+	var rusult=false;
 	var fbId=req.body.fbId;
 	playerList.each(function(p){
 		if(p.fdId==fbId){
 			p.leaveRoom();
-			p.room.broadCast(p.room.getStatus());
+			rusult=true;
 		}		
 	});
-	res.send('123');
+	res.send(rusult);
 });
 //CHATROOM
 app.post('/chatroom',function(req,res){
@@ -155,11 +156,9 @@ app.post('/player',function(req,res){
 		if(p.fdId==fbId){
 			if(action=='ready') {
 				p.Ready();
-				p.room.broadCast(p.room.getStatus());
 				res.send('ready');
 			}else if(action=='cancel'){
 				p.Cancel();
-				p.room.broadCast(p.room.getStatus());
 				res.send('cancel');
 			}
 		}
@@ -279,6 +278,7 @@ function Player(_fbId,_name,_bluetoothMac){
 		if (this.room != null)
 		{
 			this.is_ready = true;
+			this.room.broadCast(r.getStatus());
 		}
 	}
 	this.Cancel = function()
@@ -286,16 +286,20 @@ function Player(_fbId,_name,_bluetoothMac){
 		if (this.room != null)
 		{
 			this.is_ready = false;
+			this.room.broadCast(r.getStatus());
 		}		
 	}
 	this.isAdmin = function(){
 		this.role = 2;
+		this.room.broadCast(r.getStatus());
 	}
 	this.isPerson = function(){
 		this.role = 1;
+		this.room.broadCast(r.getStatus());
 	}
 	this.ishunter = function(){
 		this.role = 0;
+		this.room.broadCast(r.getStatus());
 	}
 	this.joinRoom = function(_pincode)
 	{
@@ -308,6 +312,7 @@ function Player(_fbId,_name,_bluetoothMac){
 				r.players.add(cplayer);
 				cplayer.room = r;
 				console.log("[!] " + cplayer.name + " joined room " + r.host.name);
+				r.broadCast(r.getStatus());
 				return true;
 			}
 		});
@@ -320,7 +325,7 @@ function Player(_fbId,_name,_bluetoothMac){
 	{
 		var cplayer = this;
 		this.room.players.removeElement(this);
-		this.room.broadCast("[LEFTROOM;" + this.name + "]");
+		this.room.broadCast(r.getStatus());
 		cplayer.init();
 	}
 	
