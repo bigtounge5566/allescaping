@@ -173,14 +173,20 @@ app.post('/game',function(req,res){
 			r.Play();
 			res.send('start');
 		}
+		if(action=="finish"&&r.host.fbId==hostfbId){
+			r.broadCast('gameover');
+			r.players.each(function(p){
+				p.init();
+			});
+			roomList.removeElement(r);
+		}
 	});
-
 });
 
 app.post('/getPeopleMac',function(req,res){
-	var hunterfbid = req.body.hunter;
+	var hunterfbid = req.body.hunterfbid;
 	var hunter = null;
-	var peopleMac =[{"peopleMac":[]}];
+	var peopleMac =[{'peopleMac':[]}];
 	playerList.each(function(p){
 		if(p.fbId==hunterfbid){
 			hunter = p;
@@ -207,6 +213,17 @@ app.post('/catch',function(req,res){
 	playerList.each(function(p){
 		if(p.bluetoothMac==catchedMac){
 			p.die('Catched by '+hunter.name);
+		}
+	});
+	res.send('success');
+});
+
+app.post('/getPlayerStatus',function(req,res){
+	var fbid=req.body.fbid;
+	playerList.each(function(p) {
+		if (p.fbId == fbid) {
+			var playerJson=[{'name': p.name},{'status': p.status},{'deadReason': p.deadReason},{'location':p.location}];
+			res.json(playerJson);
 		}
 	});
 });
