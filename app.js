@@ -1,8 +1,8 @@
 ﻿var express = require('express');
 var app = express();
 var roomScript = require('./room.js');
-var ArrayList = require('ArrayList');
-var bodyParser = require('body-parser')
+var ArrayList = require('arraylist');
+var bodyParser = require('body-parser');
 var roomList = new ArrayList();
 var playerList = new ArrayList();
 //ibm
@@ -58,7 +58,7 @@ app.post('/newPlayer',function(req,res){
 	var bluetoothMac=req.body.bluetoothMac;
 	var ingame=false;
 	playerList.each(function(p){
-		if(p.fdId==fbId&&p.room!=null){
+		if(p.fbId==fbId&&p.room!=null){
 			ingame=true;
 		}		
 	});	
@@ -76,7 +76,6 @@ app.post('/newPlayer',function(req,res){
 //CREATEROOM
 app.post('/createroom',function(req,res){
 	var exist = false;
-	var result = false;
 	do {
 		var pinCode=randomString(6);
 		roomList.each(function(r){
@@ -89,7 +88,7 @@ app.post('/createroom',function(req,res){
 	var date = new Date();
 	var host=null;
 	playerList.each(function(p){
-		if(p.fdId==hostfbId){
+		if(p.fbId==hostfbId){
 			host=p;
 		}
 	});
@@ -97,14 +96,14 @@ app.post('/createroom',function(req,res){
 	var room = new Room(host,time,expireTime,pinCode);
 	roomList.add(room);
 	playerList.each(function(p){
-		if(p.fdId==hostfbId){
+		if(p.fbId==hostfbId){
 			if(p.joinRoom(pinCode)){
 				p.isAdmin();
 				p.Ready();
 			}
 		}
 	});
-	res.send(hostfbId+pinCode);
+	res.send(pinCode);
 });
 //CLOSEROOM
 app.post('/closeroom',function(req,res){
@@ -116,7 +115,7 @@ app.post('/joinroom',function(req,res){
 	var pinCode=req.body.pinCode;
 	var result = false;
 	playerList.each(function(p){
-		if(p.fdId==fbId&&p.joinRoom(pinCode)){
+		if(p.fbId==fbId&&p.joinRoom(pinCode)){
 			result=true;
 		}		
 	});
@@ -127,7 +126,7 @@ app.post('/leaveroom',function(req,res){
 	var rusult=false;
 	var fbId=req.body.fbId;
 	playerList.each(function(p){
-		if(p.fdId==fbId){
+		if(p.fbId==fbId){
 			p.leaveRoom();
 			rusult=true;
 		}		
@@ -153,7 +152,7 @@ app.post('/player',function(req,res){
 	var action=req.query.action;
 	var fbId=req.body.fbId;
 	playerList.each(function(p){
-		if(p.fdId==fbId){
+		if(p.fbId==fbId){
 			if(action=='ready') {
 				p.Ready();
 				res.send('ready');
@@ -172,9 +171,44 @@ app.post('/game',function(req,res){
 	roomList.each(function(r){
 		if(action=="start"&&r.host.fbId==hostfbId&& r.IsReady){
 			r.Play();
+			res.send('start');
 		}
-	})
+	});
 
+});
+
+app.post('/getPeopleMac',function(req,res){
+	var hunterfbid = req.body.hunter;
+	var hunter = null;
+	var peopleMac =[{"peopleMac":[]}];
+	playerList.each(function(p){
+		if(p.fbId==hunterfbid){
+			hunter = p;
+		}
+	});
+	hunter.room.players.each(function(p){
+		if(p.role==1){
+			peopleMac.peopleMac.push(p.bluetoothMac);
+		}
+	});
+	res.json(peopleMac);
+});
+
+
+app.post('/catch',function(req,res){
+	var catchedMac=req.body.catchedMac;
+	var hunterfbid =req.body.hunterfbid;
+	var hunter=null;
+	playerList.each(function(p){
+		if(p.fbId==hunterfbid){
+			hunter=p;
+		}
+	});
+	playerList.each(function(p){
+		if(p.bluetoothMac==catchedMac){
+			p.die('Catched by '+hunter.name);
+		}
+	});
 });
 
 function Room(_host,_time,_expireTime,_pinCode){
@@ -328,7 +362,10 @@ function Player(_fbId,_name,_bluetoothMac){
 		this.room.broadCast(r.getStatus());
 		cplayer.init();
 	}
-	
+	this.die = function(reason){
+		this.status = 1;
+		this.deadReason=reason;
+	}
 }
 
 function randomString(len) {
@@ -336,7 +373,7 @@ function randomString(len) {
 　　var $chars = 'ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678';    /****默認去掉了容易混淆的字元oOLl,9gq,Vv,Uu,I1****/
 　　var maxPos = $chars.length;
 　　var pwd = '';
-　　for (i = 0; i < len; i++) {
+　　for (var i = 0; i < len; i++) {
 　　　　pwd += $chars.charAt(Math.floor(Math.random() * maxPos));
 　　}
 　　return pwd;

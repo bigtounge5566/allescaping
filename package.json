@@ -8,6 +8,8 @@
   },
   "dependencies": {
     "arraylist": "^0.1.0",
+    "body-parser": "^1.14.2",
+    "cfenv": "^1.0.3",
     "express": "^4.13.3",
     "ibmbluemix": "^1.0.0",
     "ibmdata": "^1.0.0",
