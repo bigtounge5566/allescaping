@@ -48,7 +48,11 @@ app.get('/',function(req,res){
 	var time = 30*60*1000;
 	var d = new Date(date.valueOf()+time);	
 	//res.send(randomString(6)+'</br>'+date.valueOf()+'   '+date.toLocaleString()+'</br>'+d.toLocaleString());
-	res.send(playerList+'</br>'+roomList);
+	var a =[];
+	playerList.each(function(p){
+		a.push(p.name);
+	});
+	res.send(a);
 });
 // Create new player on connected
 // Add to PlayerList
@@ -288,17 +292,18 @@ function Room(_host,_time,_expireTime,_pinCode){
 	}
 	this.getStatus =  function()
 	{
-		var ready = true;
+		var croom=this;
 		this.players.each(function(p){
 			if(!p.is_ready){
-				this.ready();
+				croom.Ready();
 			}else{
-				this.Wait();
+				croom.Wait();
 			}
 		});
-		var text=[{'ROOMSATUS':{'name':this.host.name,'status': this.host.is_ready,'gametime': this.time,'players':[]}}];
+		var text={'ROOMSATUS':{'name':this.host.name,'is_ready': this.host.is_ready,'gametime': this.time,'players':[]}};
+		console.log(text.ROOMSATUS);
 		this.players.each(function(p){
-			text.players.push({name:p.name,status: p.is_ready,role: p.role});
+			text.ROOMSATUS.players.push({'name':p.name,'status': p.is_ready,'role': p.role});
 		});
 		return text;
 	}
